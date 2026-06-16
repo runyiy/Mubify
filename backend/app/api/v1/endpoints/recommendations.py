@@ -3,7 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.repositories.recommendation_repository import get_similar_tracks
-from app.schemas.recommendation import RecommendationRead
+from app.schemas.recommendation import (
+    AIRecommendationRead,
+    AIRecommendationRequest,
+    RecommendationRead,
+)
+from app.services.ai_recommendation_service import get_ai_recommendations
 
 
 router = APIRouter()
@@ -36,3 +41,15 @@ def read_similar_tracks(
         }
         for track, score in results
     ]
+
+
+@router.post("/ai", response_model=list[AIRecommendationRead])
+def read_ai_recommendations(
+    request: AIRecommendationRequest,
+    db: Session = Depends(get_db),
+):
+    return get_ai_recommendations(
+        db=db,
+        prompt=request.prompt,
+        limit=request.limit,
+    )
