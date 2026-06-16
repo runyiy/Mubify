@@ -85,3 +85,7 @@ docker-compose.override.yml
 *.crt
 *.p12
 *.pfx
+
+#Chroma
+chroma_data/
+.chroma/
