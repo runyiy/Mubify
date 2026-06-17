@@ -9,15 +9,15 @@ class RecommendationRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class SemanticRecommendationRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    limit: int = Field(default=20, ge=1, le=50)
+    genre: str | None = None
 
-class AIRecommendationRequest(BaseModel):
-    prompt: str = Field(min_length=1, max_length=500)
-    limit: int = Field(default=20, ge=1, le=100)
 
-
-class AIRecommendationRead(BaseModel):
+class SemanticRecommendationRead(BaseModel):
     track: TrackRead
-    similarity_score: float
+    semantic_distance: float
     reason: str
 
     model_config = ConfigDict(from_attributes=True)

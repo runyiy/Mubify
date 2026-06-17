@@ -1,17 +1,20 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "AI Music Recommendation Backend"
+    DATABASE_URL: str
 
-    DATABASE_URL: str = "postgresql://music_user:music_password@localhost:5432/music_ai_db"
-
-    SECRET_KEY: str = "change-this-secret-key"
+    SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    class Config:
-        env_file = ".env"
+    CHROMA_PATH: str = "./chroma_db"
+    CHROMA_COLLECTION_NAME: str = "spotify_tracks"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
 settings = Settings()

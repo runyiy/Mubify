@@ -4,11 +4,11 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.repositories.recommendation_repository import get_similar_tracks
 from app.schemas.recommendation import (
-    AIRecommendationRead,
-    AIRecommendationRequest,
     RecommendationRead,
+    SemanticRecommendationRead,
+    SemanticRecommendationRequest,
 )
-from app.services.ai_recommendation_service import get_ai_recommendations
+from app.services.semantic_recommendation_service import semantic_track_search
 
 
 router = APIRouter()
@@ -43,13 +43,14 @@ def read_similar_tracks(
     ]
 
 
-@router.post("/ai", response_model=list[AIRecommendationRead])
-def read_ai_recommendations(
-    request: AIRecommendationRequest,
+@router.post("/semantic", response_model=list[SemanticRecommendationRead])
+def read_semantic_recommendations(
+    request: SemanticRecommendationRequest,
     db: Session = Depends(get_db),
 ):
-    return get_ai_recommendations(
+    return semantic_track_search(
         db=db,
-        prompt=request.prompt,
+        query=request.query,
         limit=request.limit,
+        genre=request.genre,
     )
