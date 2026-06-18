@@ -11,6 +11,7 @@ from app.repositories.favorite_repository import (
     get_user_favorites,
 )
 from app.repositories.track_repository import get_track_by_id
+from app.schemas.common import MessageResponse
 from app.schemas.favorite import FavoriteRead
 
 
@@ -64,7 +65,7 @@ def add_favorite(
     )
 
 
-@router.delete("/{track_id}")
+@router.delete("/{track_id}", response_model=MessageResponse)
 def remove_favorite(
     track_id: int,
     db: Session = Depends(get_db),

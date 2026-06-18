@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.schemas.common import HealthResponse
 
 app = FastAPI(title="Mubify")
 
@@ -20,6 +21,6 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 def health_check():
     return {"status": "ok"}
