@@ -2,8 +2,9 @@
 
 This is the backend service for **Mubify**, an AI music recommendation assistant.
 
-The backend is built with **FastAPI**, **PostgreSQL**, **SQLAlchemy**, and **Alembic**.  
-It currently supports user authentication, Spotify track search, favorites, dataset import, and a basic music recommendation API.
+The backend is built with **FastAPI**, **PostgreSQL**, **SQLAlchemy**, **Alembic**, and **ChromaDB**.
+It currently supports user authentication, Spotify track search, favorites, CSV dataset import,
+audio-feature recommendations, semantic music search, and hybrid recommendations.
 
 ---
 
@@ -15,6 +16,7 @@ It currently supports user authentication, Spotify track search, favorites, data
 | Database | PostgreSQL |
 | ORM / SQL Toolkit | SQLAlchemy |
 | Database Migration | Alembic |
+| Vector Search | ChromaDB |
 | Authentication | JWT |
 | Password Hashing | Passlib + bcrypt |
 | Testing | Pytest |
@@ -26,7 +28,8 @@ It currently supports user authentication, Spotify track search, favorites, data
 
 | Module | Feature | Endpoint |
 |---|---|---|
-| Health | Check backend / database status | `GET /api/v1/health` or `GET /api/v1/health/db` |
+| Health | Check API status | `GET /health` |
+| Health | Check database status | `GET /api/v1/health/db` |
 | Auth | Register user | `POST /api/v1/auth/register` |
 | Auth | Login user | `POST /api/v1/auth/login` |
 | Users | Get current user | `GET /api/v1/users/me` |
@@ -38,7 +41,79 @@ It currently supports user authentication, Spotify track search, favorites, data
 | Favorites | Get user favorites | `GET /api/v1/favorites` |
 | Favorites | Add favorite track | `POST /api/v1/favorites/{track_id}` |
 | Favorites | Remove favorite track | `DELETE /api/v1/favorites/{track_id}` |
-| Recommendations | Get similar tracks | `GET /api/v1/recommendations/similar/{track_id}` |
+| Recommendations | Get similar tracks by audio features | `GET /api/v1/recommendations/similar/{track_id}` |
+| Recommendations | Natural-language semantic search with ChromaDB | `POST /api/v1/recommendations/semantic` |
+| Recommendations | Hybrid semantic + audio-feature recommendations | `POST /api/v1/recommendations/hybrid` |
+
+---
+
+## Recommendation APIs
+
+### Similar Tracks
+
+`GET /api/v1/recommendations/similar/{track_id}`
+
+Query parameters:
+
+| Name | Type | Default | Notes |
+|---|---|---|---|
+| `limit` | integer | `20` | Must be between 1 and 100 |
+| `same_genre_only` | boolean | `false` | When true, only returns tracks from the same genre |
+
+This endpoint uses PostgreSQL track audio features and does not require ChromaDB.
+
+### Semantic Recommendations
+
+`POST /api/v1/recommendations/semantic`
+
+Request body:
+
+```json
+{
+  "query": "upbeat pop songs for a workout",
+  "limit": 20,
+  "genre": "pop"
+}
+```
+
+Fields:
+
+| Name | Type | Default | Notes |
+|---|---|---|---|
+| `query` | string | required | Must be 1 to 500 characters |
+| `limit` | integer | `20` | Must be between 1 and 50 |
+| `genre` | string or null | `null` | Optional Chroma metadata filter |
+
+This endpoint queries the ChromaDB collection configured by `CHROMA_COLLECTION_NAME`.
+It returns tracks from PostgreSQL using the database IDs stored in Chroma.
+
+### Hybrid Recommendations
+
+`POST /api/v1/recommendations/hybrid`
+
+Request body:
+
+```json
+{
+  "query": "calm acoustic music for studying",
+  "limit": 20,
+  "candidate_pool_size": 100,
+  "genre": "acoustic"
+}
+```
+
+Fields:
+
+| Name | Type | Default | Notes |
+|---|---|---|---|
+| `query` | string | required | Must be 1 to 500 characters |
+| `limit` | integer | `20` | Must be between 1 and 50 |
+| `candidate_pool_size` | integer | `100` | Must be between 20 and 500 |
+| `genre` | string or null | `null` | Optional Chroma metadata filter |
+
+This endpoint first retrieves candidates from ChromaDB, then reranks them with audio features
+such as `danceability`, `energy`, `valence`, `acousticness`, `instrumentalness`,
+`speechiness`, `liveness`, `tempo`, and `popularity`.
 
 ---
 
@@ -49,6 +124,177 @@ It currently supports user authentication, Spotify track search, favorites, data
 | User | `users` | Stores user account data |
 | Track | `tracks` | Stores Spotify track metadata and audio features |
 | Favorite | `favorites` | Stores user-favorite track relationships |
+
+PostgreSQL is the source of truth for tracks. ChromaDB stores derived natural-language
+documents and metadata for semantic search.
+
+---
+
+## Setup
+
+From the backend directory:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Edit `.env` so `DATABASE_URL`, `SECRET_KEY`, `CHROMA_PATH`, and
+`CHROMA_COLLECTION_NAME` match your local environment.
+
+TODO: Confirm the preferred PostgreSQL setup command for this project. The example
+`.env.example` expects a database URL like:
+
+```text
+postgresql://music_user:music_password@localhost:5432/music_ai_db
+```
+
+Apply database migrations:
+
+```bash
+alembic upgrade head
+```
+
+Start the API:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+By default, the local API will be available at:
+
+```text
+http://127.0.0.1:8000
+```
+
+FastAPI docs are available at:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+---
+
+## Import Spotify Tracks
+
+The import script reads a Spotify CSV file and inserts tracks into PostgreSQL.
+
+Default CSV path:
+
+```text
+backend/data/dataset.csv
+```
+
+Run with the default path:
+
+```bash
+python scripts/import_spotify_tracks.py
+```
+
+Run with an explicit CSV path:
+
+```bash
+python scripts/import_spotify_tracks.py path/to/dataset.csv
+```
+
+The script:
+
+- skips rows missing required track fields
+- parses numeric audio features
+- inserts in batches of 1000
+- skips duplicate Spotify `track_id` values using PostgreSQL `ON CONFLICT DO NOTHING`
+
+TODO: Confirm the exact source and filename of the dataset used by the team.
+
+---
+
+## Index Tracks Into ChromaDB
+
+Semantic and hybrid recommendation endpoints require ChromaDB to be indexed after
+tracks have been imported into PostgreSQL.
+
+Run the Chroma indexing script:
+
+```bash
+python scripts/index_tracks_chroma.py
+```
+
+Optional flags:
+
+```bash
+python scripts/index_tracks_chroma.py --limit 1000 --batch-size 500
+```
+
+The script:
+
+- reads tracks from PostgreSQL in ascending database ID order
+- converts each track into a natural-language document
+- stores metadata such as database ID, Spotify ID, track name, artists, genre, popularity, and audio features
+- upserts documents into the Chroma collection configured by `CHROMA_COLLECTION_NAME`
+
+The Chroma client uses `CHROMA_PATH` from `.env`. The default value in code is:
+
+```text
+./chroma_db
+```
+
+Run this script again after importing new tracks if those tracks should appear in
+semantic or hybrid recommendations.
+
+---
+
+## Suggested Local Workflow
+
+```bash
+cd backend
+source .venv/bin/activate
+alembic upgrade head
+python scripts/import_spotify_tracks.py
+python scripts/index_tracks_chroma.py
+uvicorn app.main:app --reload
+```
+
+Then verify:
+
+```bash
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/api/v1/health/db
+curl "http://127.0.0.1:8000/api/v1/tracks?limit=5"
+```
+
+Example semantic recommendation request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/recommendations/semantic \
+  -H "Content-Type: application/json" \
+  -d '{"query":"upbeat pop songs","limit":5}'
+```
+
+Example hybrid recommendation request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/recommendations/hybrid \
+  -H "Content-Type: application/json" \
+  -d '{"query":"calm acoustic songs","limit":5,"candidate_pool_size":50}'
+```
+
+---
+
+## Testing
+
+Run tests from the backend directory:
+
+```bash
+pytest
+```
+
+The existing tests cover authentication, tracks, favorites, audio-feature recommendations,
+and CSV row parsing.
+
+TODO: Add tests for the Chroma-backed `semantic` and `hybrid` recommendation endpoints.
 
 ---
 
@@ -90,25 +336,31 @@ backend/
 │   │   ├── recommendation.py
 │   │   ├── track.py
 │   │   └── user.py
+│   ├── services/
+│   │   ├── chroma_service.py
+│   │   ├── hybrid_recommendation_service.py
+│   │   └── semantic_recommendation_service.py
 │   └── main.py
 ├── data/
 ├── scripts/
-│   └── import_spotify_tracks.py
+│   ├── import_spotify_tracks.py
+│   └── index_tracks_chroma.py
 ├── tests/
 ├── requirements.txt
 ├── pytest.ini
 └── README.md
 ```
 
-##Future Work
+---
 
-Planned features:
+## Future Work
 
-User-based recommendation endpoint
-Playlist support
-Listening history
-ChromaDB integration
-RAG-based music search
-Natural language music recommendation assistant
-Docker support
-Deployment setup
+Planned or incomplete features:
+
+- user-based recommendation endpoint
+- playlist support
+- listening history
+- RAG-based music assistant
+- Docker support
+- deployment setup
+- Chroma-backed endpoint tests
