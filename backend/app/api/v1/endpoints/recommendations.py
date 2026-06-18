@@ -11,6 +11,11 @@ from app.schemas.recommendation import (
     SemanticRecommendationRequest,
 )
 from app.services.hybrid_recommendation_service import hybrid_recommendation_search
+from app.services.recommendation_errors import (
+    RecommendationDependencyUnavailableError,
+    RecommendationIndexCorruptError,
+    RecommendationIndexNotReadyError,
+)
 from app.services.semantic_recommendation_service import semantic_track_search
 
 
@@ -51,12 +56,28 @@ def read_semantic_recommendations(
     request: SemanticRecommendationRequest,
     db: Session = Depends(get_db),
 ):
-    return semantic_track_search(
-        db=db,
-        query=request.query,
-        limit=request.limit,
-        genre=request.genre,
-    )
+    try:
+        return semantic_track_search(
+            db=db,
+            query=request.query,
+            limit=request.limit,
+            genre=request.genre,
+        )
+    except RecommendationIndexNotReadyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except RecommendationDependencyUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except RecommendationIndexCorruptError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post("/hybrid", response_model=list[HybridRecommendationRead])
@@ -64,10 +85,26 @@ def read_hybrid_recommendations(
     request: HybridRecommendationRequest,
     db: Session = Depends(get_db),
 ):
-    return hybrid_recommendation_search(
-        db=db,
-        query=request.query,
-        limit=request.limit,
-        candidate_pool_size=request.candidate_pool_size,
-        genre=request.genre,
-    )
+    try:
+        return hybrid_recommendation_search(
+            db=db,
+            query=request.query,
+            limit=request.limit,
+            candidate_pool_size=request.candidate_pool_size,
+            genre=request.genre,
+        )
+    except RecommendationIndexNotReadyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except RecommendationDependencyUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except RecommendationIndexCorruptError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc

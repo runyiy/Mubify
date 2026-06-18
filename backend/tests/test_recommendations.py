@@ -1,3 +1,37 @@
+import pytest
+from fastapi import HTTPException
+
+from app.api.v1.endpoints import recommendations as recommendations_endpoint
+from app.schemas.recommendation import HybridRecommendationRequest
+from app.schemas.recommendation import SemanticRecommendationRequest
+from app.services import hybrid_recommendation_service
+from app.services import semantic_recommendation_service
+from app.services.recommendation_errors import (
+    RecommendationDependencyUnavailableError,
+    RecommendationIndexCorruptError,
+    RecommendationIndexNotReadyError,
+)
+
+
+class FakeCollection:
+    def __init__(self, count=1, query_result=None, query_error=None):
+        self._count = count
+        self._query_result = query_result or {
+            "ids": [[]],
+            "distances": [[]],
+        }
+        self._query_error = query_error
+
+    def count(self):
+        return self._count
+
+    def query(self, **kwargs):
+        if self._query_error:
+            raise self._query_error
+
+        return self._query_result
+
+
 def test_get_similar_tracks_not_found(client):
     response = client.get("/api/v1/recommendations/similar/999999")
 
@@ -115,3 +149,254 @@ def test_get_similar_tracks_limit_too_large_returns_422(client, track_factory):
     response = client.get(f"/api/v1/recommendations/similar/{target.id}?limit=101")
 
     assert response.status_code == 422
+
+
+def test_semantic_recommendations_chroma_unavailable_returns_503(monkeypatch):
+    def raise_chroma_unavailable(**kwargs):
+        raise RecommendationDependencyUnavailableError(
+            "ChromaDB recommendation index is unavailable."
+        )
+
+    monkeypatch.setattr(
+        recommendations_endpoint,
+        "semantic_track_search",
+        raise_chroma_unavailable,
+    )
+
+    request = SemanticRecommendationRequest(
+        query="upbeat pop songs",
+        limit=5,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        recommendations_endpoint.read_semantic_recommendations(
+            request=request,
+            db=None,
+        )
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == "ChromaDB recommendation index is unavailable."
+
+
+def test_hybrid_recommendations_index_not_ready_returns_503(monkeypatch):
+    def raise_index_not_ready(**kwargs):
+        raise RecommendationIndexNotReadyError(
+            "Recommendation index is not ready. Import tracks and run Chroma indexing first."
+        )
+
+    monkeypatch.setattr(
+        recommendations_endpoint,
+        "hybrid_recommendation_search",
+        raise_index_not_ready,
+    )
+
+    request = HybridRecommendationRequest(
+        query="calm acoustic songs",
+        limit=5,
+        candidate_pool_size=50,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        recommendations_endpoint.read_hybrid_recommendations(
+            request=request,
+            db=None,
+        )
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == (
+        "Recommendation index is not ready. Import tracks and run Chroma indexing first."
+    )
+
+
+def test_semantic_recommendations_index_corrupt_returns_500(monkeypatch):
+    def raise_index_corrupt(**kwargs):
+        raise RecommendationIndexCorruptError(
+            "Recommendation index is inconsistent with the track database."
+        )
+
+    monkeypatch.setattr(
+        recommendations_endpoint,
+        "semantic_track_search",
+        raise_index_corrupt,
+    )
+
+    request = SemanticRecommendationRequest(
+        query="upbeat pop songs",
+        limit=5,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        recommendations_endpoint.read_semantic_recommendations(
+            request=request,
+            db=None,
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == (
+        "Recommendation index is inconsistent with the track database."
+    )
+
+
+def test_semantic_track_search_empty_index_raises_not_ready(db_session, monkeypatch):
+    monkeypatch.setattr(
+        semantic_recommendation_service,
+        "get_track_collection",
+        lambda: FakeCollection(count=0),
+    )
+
+    with pytest.raises(RecommendationIndexNotReadyError):
+        semantic_recommendation_service.semantic_track_search(
+            db=db_session,
+            query="upbeat pop songs",
+        )
+
+
+def test_semantic_track_search_query_error_raises_dependency_unavailable(
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        semantic_recommendation_service,
+        "get_track_collection",
+        lambda: FakeCollection(query_error=RuntimeError("embedding failed")),
+    )
+
+    with pytest.raises(RecommendationDependencyUnavailableError):
+        semantic_recommendation_service.semantic_track_search(
+            db=db_session,
+            query="upbeat pop songs",
+        )
+
+
+def test_semantic_track_search_no_results_returns_empty_list(db_session, monkeypatch):
+    monkeypatch.setattr(
+        semantic_recommendation_service,
+        "get_track_collection",
+        lambda: FakeCollection(
+            count=10,
+            query_result={
+                "ids": [[]],
+                "distances": [[]],
+            },
+        ),
+    )
+
+    results = semantic_recommendation_service.semantic_track_search(
+        db=db_session,
+        query="no matching songs",
+    )
+
+    assert results == []
+
+
+def test_semantic_track_search_bad_chroma_id_raises_index_corrupt(
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        semantic_recommendation_service,
+        "get_track_collection",
+        lambda: FakeCollection(
+            query_result={
+                "ids": [["not-an-integer"]],
+                "distances": [[0.1]],
+            },
+        ),
+    )
+
+    with pytest.raises(RecommendationIndexCorruptError):
+        semantic_recommendation_service.semantic_track_search(
+            db=db_session,
+            query="upbeat pop songs",
+        )
+
+
+def test_semantic_track_search_bad_distance_raises_index_corrupt(
+    db_session,
+    monkeypatch,
+    track_factory,
+):
+    track = track_factory()
+
+    monkeypatch.setattr(
+        semantic_recommendation_service,
+        "get_track_collection",
+        lambda: FakeCollection(
+            query_result={
+                "ids": [[str(track.id)]],
+                "distances": [["not-a-distance"]],
+            },
+        ),
+    )
+
+    with pytest.raises(RecommendationIndexCorruptError):
+        semantic_recommendation_service.semantic_track_search(
+            db=db_session,
+            query="upbeat pop songs",
+        )
+
+
+def test_semantic_track_search_missing_db_track_raises_index_corrupt(
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        semantic_recommendation_service,
+        "get_track_collection",
+        lambda: FakeCollection(
+            query_result={
+                "ids": [["999999"]],
+                "distances": [[0.1]],
+            },
+        ),
+    )
+
+    with pytest.raises(RecommendationIndexCorruptError):
+        semantic_recommendation_service.semantic_track_search(
+            db=db_session,
+            query="upbeat pop songs",
+        )
+
+
+def test_hybrid_get_chroma_candidates_query_error_raises_dependency_unavailable(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        hybrid_recommendation_service,
+        "get_track_collection",
+        lambda: FakeCollection(query_error=RuntimeError("embedding failed")),
+    )
+
+    with pytest.raises(RecommendationDependencyUnavailableError):
+        hybrid_recommendation_service.get_chroma_candidates(
+            query="calm acoustic songs",
+            candidate_pool_size=50,
+        )
+
+
+def test_hybrid_get_chroma_candidates_bad_distance_raises_index_corrupt(monkeypatch):
+    monkeypatch.setattr(
+        hybrid_recommendation_service,
+        "get_track_collection",
+        lambda: FakeCollection(
+            query_result={
+                "ids": [["1"]],
+                "distances": [["not-a-distance"]],
+            },
+        ),
+    )
+
+    with pytest.raises(RecommendationIndexCorruptError):
+        hybrid_recommendation_service.get_chroma_candidates(
+            query="calm acoustic songs",
+            candidate_pool_size=50,
+        )
+
+
+def test_hybrid_build_candidates_missing_db_tracks_raises_index_corrupt(db_session):
+    with pytest.raises(RecommendationIndexCorruptError):
+        hybrid_recommendation_service.build_candidates(
+            db=db_session,
+            track_ids=[999999],
+            semantic_distances=[0.1],
+        )

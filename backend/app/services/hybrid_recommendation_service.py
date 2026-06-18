@@ -1,10 +1,24 @@
 from dataclasses import dataclass
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.track import Track
 from app.services.chroma_service import get_track_collection
+from app.services.recommendation_errors import (
+    RecommendationDependencyUnavailableError,
+    RecommendationIndexCorruptError,
+    RecommendationIndexNotReadyError,
+)
+
+
+INDEX_NOT_READY_MESSAGE = (
+    "Recommendation index is not ready. Import tracks and run Chroma indexing first."
+)
+CHROMA_UNAVAILABLE_MESSAGE = "ChromaDB recommendation index is unavailable."
+DATABASE_UNAVAILABLE_MESSAGE = "Track database is unavailable."
+INDEX_CORRUPT_MESSAGE = "Recommendation index is inconsistent with the track database."
 
 
 @dataclass
@@ -47,26 +61,48 @@ def get_chroma_candidates(
     candidate_pool_size: int,
     genre: str | None = None,
 ) -> tuple[list[int], list[float]]:
-    collection = get_track_collection()
+    try:
+        collection = get_track_collection()
+        index_count = collection.count()
+    except Exception as exc:
+        raise RecommendationDependencyUnavailableError(
+            CHROMA_UNAVAILABLE_MESSAGE
+        ) from exc
+
+    if index_count == 0:
+        raise RecommendationIndexNotReadyError(INDEX_NOT_READY_MESSAGE)
 
     where_filter = None
 
     if genre:
         where_filter = {"track_genre": genre}
 
-    results = collection.query(
-        query_texts=[query],
-        n_results=candidate_pool_size,
-        where=where_filter,
-        include=["metadatas", "distances"],
-    )
+    try:
+        results = collection.query(
+            query_texts=[query],
+            n_results=candidate_pool_size,
+            where=where_filter,
+            include=["metadatas", "distances"],
+        )
+    except Exception as exc:
+        raise RecommendationDependencyUnavailableError(
+            CHROMA_UNAVAILABLE_MESSAGE
+        ) from exc
 
     raw_ids = results.get("ids", [[]])[0]
     distances = results.get("distances", [[]])[0]
 
-    track_ids = [int(raw_id) for raw_id in raw_ids]
+    try:
+        track_ids = [int(raw_id) for raw_id in raw_ids]
+    except (TypeError, ValueError) as exc:
+        raise RecommendationIndexCorruptError(INDEX_CORRUPT_MESSAGE) from exc
 
-    return track_ids, [float(distance) for distance in distances]
+    try:
+        semantic_distances = [float(distance) for distance in distances]
+    except (TypeError, ValueError) as exc:
+        raise RecommendationIndexCorruptError(INDEX_CORRUPT_MESSAGE) from exc
+
+    return track_ids, semantic_distances
 
 
 def fetch_tracks_by_ids(
@@ -77,7 +113,13 @@ def fetch_tracks_by_ids(
         return {}
 
     statement = select(Track).where(Track.id.in_(track_ids))
-    tracks = list(db.scalars(statement).all())
+
+    try:
+        tracks = list(db.scalars(statement).all())
+    except SQLAlchemyError as exc:
+        raise RecommendationDependencyUnavailableError(
+            DATABASE_UNAVAILABLE_MESSAGE
+        ) from exc
 
     return {track.id: track for track in tracks}
 
@@ -103,6 +145,9 @@ def build_candidates(
                 semantic_distance=semantic_distance,
             )
         )
+
+    if track_ids and not candidates:
+        raise RecommendationIndexCorruptError(INDEX_CORRUPT_MESSAGE)
 
     return candidates
 
