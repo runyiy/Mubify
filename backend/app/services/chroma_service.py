@@ -2,13 +2,16 @@ from functools import lru_cache
 
 import chromadb
 
-from app.core.config import settings
 from app.models.track import Track
+
+
+CHROMA_PATH = "./chroma_db"
+CHROMA_COLLECTION_NAME = "spotify_tracks"
 
 
 @lru_cache
 def get_chroma_client():
-    return chromadb.PersistentClient(path=settings.CHROMA_PATH)
+    return chromadb.PersistentClient(path=CHROMA_PATH)
 
 
 @lru_cache
@@ -16,7 +19,7 @@ def get_track_collection():
     client = get_chroma_client()
 
     return client.get_or_create_collection(
-        name=settings.CHROMA_COLLECTION_NAME,
+        name=CHROMA_COLLECTION_NAME,
         metadata={
             "description": "Spotify tracks semantic search collection",
         },

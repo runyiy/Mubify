@@ -1,5 +1,14 @@
+import os
+
+os.environ.setdefault("DATABASE_URL", "sqlite://")
+os.environ.setdefault("SECRET_KEY", "test-secret-key")
+os.environ.setdefault("JWT_ALGORITHM", "HS256")
+os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+
+import anyio.to_thread
+import anyio
+import httpx
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -9,6 +18,44 @@ import app.models  # noqa: F401
 from app.db.session import get_db
 from app.main import app
 from app.models.track import Track
+
+
+async def _run_sync_inline(func, *args, **kwargs):
+    return func(*args)
+
+
+anyio.to_thread.run_sync = _run_sync_inline
+
+
+class ASGITestClient:
+    def __init__(self, app):
+        self.app = app
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return None
+
+    def request(self, method: str, url: str, **kwargs):
+        async def send_request():
+            transport = httpx.ASGITransport(app=self.app)
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                return await client.request(method, url, **kwargs)
+
+        return anyio.run(send_request)
+
+    def get(self, url: str, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url: str, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def delete(self, url: str, **kwargs):
+        return self.request("DELETE", url, **kwargs)
 
 
 SQLALCHEMY_DATABASE_URL = "sqlite://"
@@ -50,7 +97,7 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    with TestClient(app) as test_client:
+    with ASGITestClient(app) as test_client:
         yield test_client
 
     app.dependency_overrides.clear()

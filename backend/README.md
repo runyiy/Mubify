@@ -84,7 +84,7 @@ Fields:
 | `limit` | integer | `20` | Must be between 1 and 50 |
 | `genre` | string or null | `null` | Optional Chroma metadata filter |
 
-This endpoint queries the ChromaDB collection configured by `CHROMA_COLLECTION_NAME`.
+This endpoint queries the ChromaDB collection used by the recommendation service.
 It returns tracks from PostgreSQL using the database IDs stored in Chroma.
 
 ### Hybrid Recommendations
@@ -142,8 +142,27 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` so `DATABASE_URL`, `SECRET_KEY`, `CHROMA_PATH`, and
-`CHROMA_COLLECTION_NAME` match your local environment.
+The `.env` file must live at:
+
+```text
+backend/.env
+```
+
+The backend loads that file directly, so commands may be run from the repository
+root or from the backend directory.
+
+Edit `.env` so the required values match your local environment:
+
+| Name | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection URL used by the API, scripts, and Alembic |
+| `SECRET_KEY` | Yes | JWT signing secret; replace the example value for local development |
+| `JWT_ALGORITHM` | No | Defaults to `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Defaults to `30` |
+
+If startup fails with `Missing backend configuration`, create `backend/.env`
+from `backend/.env.example` or set the missing environment variables before
+running the command.
 
 TODO: Confirm the preferred PostgreSQL setup command for this project. The example
 `.env.example` expects a database URL like:
@@ -233,9 +252,9 @@ The script:
 - reads tracks from PostgreSQL in ascending database ID order
 - converts each track into a natural-language document
 - stores metadata such as database ID, Spotify ID, track name, artists, genre, popularity, and audio features
-- upserts documents into the Chroma collection configured by `CHROMA_COLLECTION_NAME`
+- upserts documents into the Chroma collection used by the recommendation service
 
-The Chroma client uses `CHROMA_PATH` from `.env`. The default value in code is:
+The Chroma client currently uses the local path:
 
 ```text
 ./chroma_db
@@ -288,8 +307,12 @@ curl -X POST http://127.0.0.1:8000/api/v1/recommendations/hybrid \
 Run tests from the backend directory:
 
 ```bash
+pip install -r requirements-dev.txt
 pytest
 ```
+
+Tests set their own safe `DATABASE_URL` and `SECRET_KEY` in `tests/conftest.py`,
+so they do not require a local `backend/.env`.
 
 The existing tests cover authentication, tracks, favorites, audio-feature recommendations,
 and CSV row parsing.
