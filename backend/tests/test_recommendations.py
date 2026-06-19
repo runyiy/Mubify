@@ -32,6 +32,38 @@ class FakeCollection:
         return self._query_result
 
 
+@pytest.mark.parametrize(
+    ("error", "expected_status_code"),
+    [
+        (
+            RecommendationIndexNotReadyError("Recommendation index is not ready."),
+            503,
+        ),
+        (
+            RecommendationDependencyUnavailableError(
+                "ChromaDB recommendation index is unavailable."
+            ),
+            503,
+        ),
+        (
+            RecommendationIndexCorruptError(
+                "Recommendation index is inconsistent with the track database."
+            ),
+            500,
+        ),
+    ],
+)
+def test_handle_recommendation_error_maps_status_code_and_detail(
+    error,
+    expected_status_code,
+):
+    with pytest.raises(HTTPException) as exc_info:
+        recommendations_endpoint.handle_recommendation_error(error)
+
+    assert exc_info.value.status_code == expected_status_code
+    assert exc_info.value.detail == str(error)
+
+
 def test_get_similar_tracks_not_found(client):
     response = client.get("/api/v1/recommendations/similar/999999")
 

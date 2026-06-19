@@ -12,6 +12,7 @@ from app.schemas.recommendation import (
 )
 from app.services.hybrid_recommendation_service import hybrid_recommendation_search
 from app.services.recommendation_errors import (
+    RecommendationError,
     RecommendationDependencyUnavailableError,
     RecommendationIndexCorruptError,
     RecommendationIndexNotReadyError,
@@ -20,6 +21,22 @@ from app.services.semantic_recommendation_service import semantic_track_search
 
 
 router = APIRouter()
+
+
+RECOMMENDATION_ERROR_STATUS_CODES = {
+    RecommendationIndexNotReadyError: status.HTTP_503_SERVICE_UNAVAILABLE,
+    RecommendationDependencyUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
+    RecommendationIndexCorruptError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+}
+
+
+def handle_recommendation_error(exc: RecommendationError) -> None:
+    status_code = RECOMMENDATION_ERROR_STATUS_CODES[type(exc)]
+
+    raise HTTPException(
+        status_code=status_code,
+        detail=str(exc),
+    ) from exc
 
 
 @router.get("/similar/{track_id}", response_model=list[RecommendationRead])
@@ -63,21 +80,12 @@ def read_semantic_recommendations(
             limit=request.limit,
             genre=request.genre,
         )
-    except RecommendationIndexNotReadyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        ) from exc
-    except RecommendationDependencyUnavailableError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        ) from exc
-    except RecommendationIndexCorruptError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
+    except (
+        RecommendationIndexNotReadyError,
+        RecommendationDependencyUnavailableError,
+        RecommendationIndexCorruptError,
+    ) as exc:
+        handle_recommendation_error(exc)
 
 
 @router.post("/hybrid", response_model=list[HybridRecommendationRead])
@@ -93,18 +101,9 @@ def read_hybrid_recommendations(
             candidate_pool_size=request.candidate_pool_size,
             genre=request.genre,
         )
-    except RecommendationIndexNotReadyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        ) from exc
-    except RecommendationDependencyUnavailableError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        ) from exc
-    except RecommendationIndexCorruptError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
+    except (
+        RecommendationIndexNotReadyError,
+        RecommendationDependencyUnavailableError,
+        RecommendationIndexCorruptError,
+    ) as exc:
+        handle_recommendation_error(exc)
