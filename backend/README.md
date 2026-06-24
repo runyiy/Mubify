@@ -240,10 +240,13 @@ http://127.0.0.1:8000/docs
 
 ## Import Spotify Tracks
 
-The import script reads a Spotify CSV file and inserts tracks into PostgreSQL.
+The import script reads a Spotify CSV file and inserts tracks into PostgreSQL. This
+project uses the [Spotify Tracks Dataset](https://www.kaggle.com/datasets/maharshipandya/-spotify-tracks-dataset)
+published on Kaggle by `maharshipandya`.
 
-The dataset is not committed to this repository. Create the data directory and manually
-place a compatible CSV file at the default location:
+The dataset is not committed to this repository. The expected local filename is
+`dataset.csv`. Create the data directory and manually place a compatible CSV file at
+the default location:
 
 ```bash
 mkdir -p data
@@ -255,6 +258,39 @@ Default CSV path:
 ```text
 backend/data/dataset.csv
 ```
+
+The input must be a CSV file encoded as UTF-8 with a header row. The importer expects
+this complete header (column order may differ):
+
+```csv
+track_id,artists,album_name,track_name,popularity,duration_ms,explicit,danceability,energy,key,loudness,mode,speechiness,acousticness,instrumentalness,liveness,valence,tempo,time_signature,track_genre
+```
+
+Required text and metadata columns:
+
+```text
+track_id, artists, album_name, track_name, track_genre
+```
+
+Required numeric and audio-feature columns:
+
+```text
+popularity, duration_ms, danceability, energy, key, loudness, mode,
+speechiness, acousticness, instrumentalness, liveness, valence, tempo,
+time_signature
+```
+
+Boolean column:
+
+```text
+explicit
+```
+
+The current importer skips rows when one of the required text or metadata values is
+missing. It does not reject missing or invalid numeric values: integer and floating-point
+parsers currently replace them with `0` or `0.0`. Missing or unrecognized `explicit`
+values become `false`. These defaults can reduce recommendation quality, so validate the
+source CSV before importing it. Extra CSV columns are ignored.
 
 Run with the default path:
 
@@ -275,16 +311,10 @@ The script:
 - inserts in batches of 1000
 - skips duplicate Spotify `track_id` values using PostgreSQL `ON CONFLICT DO NOTHING`
 
-At minimum, each imported row must contain non-empty values for:
-
-```text
-track_id, artists, album_name, track_name, track_genre
-```
-
-TODO: The repository does not currently identify the team's exact dataset download
-source, original filename, version, or license. Obtain a compatible `dataset.csv` from
-the project maintainer and place it manually at `backend/data/dataset.csv`. Do not assume
-that every similarly named Spotify dataset has the columns expected by the import script.
+The repository does not pin a specific dataset version or document the dataset license.
+Before redistributing the dataset or using it in production, check the Kaggle dataset
+page and confirm the applicable version and license. The repository's software license
+must not be assumed to apply to this third-party dataset.
 
 ---
 
