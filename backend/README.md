@@ -142,6 +142,10 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
+`requirements.txt` contains the complete backend runtime dependency set, including
+ChromaDB for the semantic and hybrid recommendation routes. No additional dependency
+installation is required before starting the API.
+
 The `.env` file must live at:
 
 ```text
@@ -328,7 +332,6 @@ alembic upgrade head
 mkdir -p data
 # Manually place the prepared CSV at data/dataset.csv before continuing.
 python scripts/import_spotify_tracks.py
-pip install -r requirements-ai.txt
 python scripts/index_tracks_chroma.py
 uvicorn app.main:app --reload
 ```
@@ -368,7 +371,7 @@ Check the following before running migrations or starting the API:
 - `backend/.env` exists and contains `DATABASE_URL` and `SECRET_KEY`
 - `alembic upgrade head` completes successfully
 - `backend/data/dataset.csv` exists before running the default import command
-- `requirements-ai.txt` is installed before Chroma indexing or semantic recommendations
+- `requirements.txt` is installed, including the ChromaDB recommendation dependency
 - tracks have been imported into PostgreSQL before building the Chroma index
 
 ## Common Setup Errors
@@ -401,11 +404,11 @@ python scripts/import_spotify_tracks.py /absolute/path/to/dataset.csv
 
 ### Semantic or hybrid recommendations report that the index is unavailable
 
-Install the AI dependencies, import tracks into PostgreSQL, and then build the Chroma
-index before calling these endpoints:
+Confirm that the runtime dependencies are installed, import tracks into PostgreSQL,
+and then build the Chroma index before calling these endpoints:
 
 ```bash
-pip install -r requirements-ai.txt
+pip install -r requirements.txt
 python scripts/index_tracks_chroma.py
 ```
 
@@ -419,6 +422,9 @@ Run tests from the backend directory:
 pip install -r requirements-dev.txt
 pytest
 ```
+
+`requirements-dev.txt` includes the complete runtime dependency set from
+`requirements.txt`, then adds the testing dependencies.
 
 Tests set their own safe `DATABASE_URL` and `SECRET_KEY` in `tests/conftest.py`,
 so they do not require a local `backend/.env`.
