@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.repositories.track_repository import (
+    count_tracks,
     get_track_by_id,
     get_track_by_spotify_id,
     get_tracks,
 )
-from app.schemas.track import TrackRead
+from app.schemas.track import PaginatedTracksResponse, TrackRead
 
 router = APIRouter()
 
@@ -26,6 +27,32 @@ def read_tracks(
         limit=limit,
         genre=genre,
         search=search,
+    )
+
+
+@router.get("/paginated", response_model=PaginatedTracksResponse)
+def read_paginated_tracks(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    genre: str | None = None,
+    search: str | None = None,
+    db: Session = Depends(get_db),
+):
+    items = get_tracks(
+        db=db,
+        skip=skip,
+        limit=limit,
+        genre=genre,
+        search=search,
+    )
+    total = count_tracks(db=db, genre=genre, search=search)
+
+    return PaginatedTracksResponse(
+        items=items,
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_next=skip + len(items) < total,
     )
 
 

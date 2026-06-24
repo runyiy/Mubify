@@ -36,3 +36,11 @@ class TrackRead(TrackBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedTracksResponse(BaseModel):
+    items: list[TrackRead]
+    total: int
+    skip: int
+    limit: int
+    has_next: bool

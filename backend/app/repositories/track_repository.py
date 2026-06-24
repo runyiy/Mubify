@@ -1,4 +1,4 @@
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.track import Track
@@ -14,15 +14,11 @@ def get_track_by_spotify_id(db: Session, spotify_track_id: str) -> Track | None:
     return db.scalar(statement)
 
 
-def get_tracks(
-    db: Session,
-    skip: int = 0,
-    limit: int = 20,
+def _apply_track_filters(
+    statement,
     genre: str | None = None,
     search: str | None = None,
-) -> list[Track]:
-    statement = select(Track)
-
+):
     if genre:
         statement = statement.where(Track.track_genre == genre)
 
@@ -36,6 +32,22 @@ def get_tracks(
             )
         )
 
+    return statement
+
+
+def get_tracks(
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
+    genre: str | None = None,
+    search: str | None = None,
+) -> list[Track]:
+    statement = _apply_track_filters(
+        select(Track),
+        genre=genre,
+        search=search,
+    )
+
     statement = (
         statement
         .order_by(Track.popularity.desc(), Track.id.asc())
@@ -44,3 +56,17 @@ def get_tracks(
     )
 
     return list(db.scalars(statement).all())
+
+
+def count_tracks(
+    db: Session,
+    genre: str | None = None,
+    search: str | None = None,
+) -> int:
+    statement = _apply_track_filters(
+        select(func.count()).select_from(Track),
+        genre=genre,
+        search=search,
+    )
+
+    return db.scalar(statement) or 0

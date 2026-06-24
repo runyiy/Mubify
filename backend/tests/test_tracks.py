@@ -109,6 +109,61 @@ def test_get_tracks_search_by_album_name(client, track_factory):
     assert data[0]["album_name"] == "Midnights"
 
 
+def test_get_paginated_tracks_returns_metadata(client, track_factory):
+    track_factory(track_name="Song 1", popularity=90)
+    track_factory(track_name="Song 2", popularity=80)
+    track_factory(track_name="Song 3", popularity=70)
+
+    response = client.get("/api/v1/tracks/paginated?skip=1&limit=1")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert isinstance(data, dict)
+    assert set(data) == {"items", "total", "skip", "limit", "has_next"}
+    assert len(data["items"]) == 1
+    assert data["items"][0]["track_name"] == "Song 2"
+    assert data["total"] == 3
+    assert data["skip"] == 1
+    assert data["limit"] == 1
+    assert data["has_next"] is True
+
+
+def test_get_paginated_tracks_total_uses_search_and_genre_filters(
+    client,
+    track_factory,
+):
+    track_factory(
+        track_name="Pop Love Song",
+        track_genre="pop",
+        popularity=90,
+    )
+    track_factory(
+        track_name="Pop Dance Song",
+        track_genre="pop",
+        popularity=80,
+    )
+    track_factory(
+        track_name="Rock Love Song",
+        track_genre="rock",
+        popularity=70,
+    )
+
+    response = client.get(
+        "/api/v1/tracks/paginated?genre=pop&search=love&limit=1"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["items"]) == 1
+    assert data["items"][0]["track_name"] == "Pop Love Song"
+    assert data["total"] == 1
+    assert data["has_next"] is False
+
+
 def test_get_track_by_database_id_success(client, track_factory):
     track = track_factory(track_name="Single Track")
 
