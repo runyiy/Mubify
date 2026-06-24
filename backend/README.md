@@ -20,7 +20,7 @@ audio-feature recommendations, semantic music search, and hybrid recommendations
 | Authentication | JWT |
 | Password Hashing | Passlib + bcrypt |
 | Testing | Pytest |
-| Dataset | Kaggle Spotify Tracks Dataset |
+| Dataset | Spotify tracks CSV (exact source pending confirmation) |
 
 ---
 
@@ -164,11 +164,48 @@ If startup fails with `Missing backend configuration`, create `backend/.env`
 from `backend/.env.example` or set the missing environment variables before
 running the command.
 
-TODO: Confirm the preferred PostgreSQL setup command for this project. The example
-`.env.example` expects a database URL like:
+### Create a Local PostgreSQL Database
+
+The project currently expects PostgreSQL. Docker setup is not included, so the
+following example uses a locally installed PostgreSQL server.
+
+On Linux, open PostgreSQL as its administrative user:
+
+```bash
+sudo -u postgres psql
+```
+
+Create a dedicated local user and database:
+
+```sql
+CREATE USER mubify_user WITH PASSWORD 'change_me';
+CREATE DATABASE mubify OWNER mubify_user;
+\q
+```
+
+Update `backend/.env` to use the same credentials:
+
+```dotenv
+DATABASE_URL=postgresql://mubify_user:change_me@localhost:5432/mubify
+SECRET_KEY=replace-this-with-a-long-random-secret
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+The PostgreSQL URL has this format:
 
 ```text
-postgresql://music_user:music_password@localhost:5432/music_ai_db
+postgresql://<username>:<password>@<host>:<port>/<database>
+```
+
+If the password contains URL-reserved characters such as `@`, `:`, or `/`, URL-encode
+those characters in `DATABASE_URL`. PostgreSQL installation and service startup commands
+vary by operating system; confirm that the server is running before continuing.
+
+You can test the example connection with:
+
+```bash
+psql "postgresql://mubify_user:change_me@localhost:5432/mubify"
 ```
 
 Apply database migrations:
@@ -201,6 +238,14 @@ http://127.0.0.1:8000/docs
 
 The import script reads a Spotify CSV file and inserts tracks into PostgreSQL.
 
+The dataset is not committed to this repository. Create the data directory and manually
+place a compatible CSV file at the default location:
+
+```bash
+mkdir -p data
+# Manually place the prepared CSV at: data/dataset.csv
+```
+
 Default CSV path:
 
 ```text
@@ -226,7 +271,16 @@ The script:
 - inserts in batches of 1000
 - skips duplicate Spotify `track_id` values using PostgreSQL `ON CONFLICT DO NOTHING`
 
-TODO: Confirm the exact source and filename of the dataset used by the team.
+At minimum, each imported row must contain non-empty values for:
+
+```text
+track_id, artists, album_name, track_name, track_genre
+```
+
+TODO: The repository does not currently identify the team's exact dataset download
+source, original filename, version, or license. Obtain a compatible `dataset.csv` from
+the project maintainer and place it manually at `backend/data/dataset.csv`. Do not assume
+that every similarly named Spotify dataset has the columns expected by the import script.
 
 ---
 
@@ -271,7 +325,10 @@ semantic or hybrid recommendations.
 cd backend
 source .venv/bin/activate
 alembic upgrade head
+mkdir -p data
+# Manually place the prepared CSV at data/dataset.csv before continuing.
 python scripts/import_spotify_tracks.py
+pip install -r requirements-ai.txt
 python scripts/index_tracks_chroma.py
 uvicorn app.main:app --reload
 ```
@@ -298,6 +355,58 @@ Example hybrid recommendation request:
 curl -X POST http://127.0.0.1:8000/api/v1/recommendations/hybrid \
   -H "Content-Type: application/json" \
   -d '{"query":"calm acoustic songs","limit":5,"candidate_pool_size":50}'
+```
+
+---
+
+## Before You Start
+
+Check the following before running migrations or starting the API:
+
+- the virtual environment is active and `requirements.txt` is installed
+- PostgreSQL is installed, running, and accepts the credentials in `backend/.env`
+- `backend/.env` exists and contains `DATABASE_URL` and `SECRET_KEY`
+- `alembic upgrade head` completes successfully
+- `backend/data/dataset.csv` exists before running the default import command
+- `requirements-ai.txt` is installed before Chroma indexing or semantic recommendations
+- tracks have been imported into PostgreSQL before building the Chroma index
+
+## Common Setup Errors
+
+### Database connection fails
+
+Confirm that PostgreSQL is running and that the username, password, port, and database
+name in `DATABASE_URL` match the values created in PostgreSQL. Test the same URL directly:
+
+```bash
+psql "$DATABASE_URL"
+```
+
+If the shell does not load variables from `backend/.env`, pass the URL explicitly to
+`psql` instead. The application itself reads `backend/.env` directly.
+
+### `CSV file not found`
+
+The default import command expects this exact path:
+
+```text
+backend/data/dataset.csv
+```
+
+Create `backend/data/` and place the CSV there, or provide an explicit file path:
+
+```bash
+python scripts/import_spotify_tracks.py /absolute/path/to/dataset.csv
+```
+
+### Semantic or hybrid recommendations report that the index is unavailable
+
+Install the AI dependencies, import tracks into PostgreSQL, and then build the Chroma
+index before calling these endpoints:
+
+```bash
+pip install -r requirements-ai.txt
+python scripts/index_tracks_chroma.py
 ```
 
 ---

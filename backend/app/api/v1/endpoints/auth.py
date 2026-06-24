@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token
@@ -33,7 +34,14 @@ def register_user(
             detail="Email or username already registered",
         )
 
-    return create_user(db=db, user_in=user_in)
+    try:
+        return create_user(db=db, user_in=user_in)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username already registered",
+        ) from exc
 
 
 @router.post("/login", response_model=Token)
