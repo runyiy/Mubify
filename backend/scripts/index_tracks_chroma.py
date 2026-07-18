@@ -1,11 +1,6 @@
 import argparse
-import sys
-from pathlib import Path
 
 from sqlalchemy import select
-
-BASE_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(BASE_DIR))
 
 from app.db.session import SessionLocal
 from app.models.track import Track
