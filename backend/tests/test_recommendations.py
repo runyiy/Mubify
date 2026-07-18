@@ -150,8 +150,7 @@ def test_get_similar_tracks_same_genre_only(client, track_factory):
     )
 
     response = client.get(
-        f"/api/v1/recommendations/similar/{target.id}"
-        "?limit=10&same_genre_only=true"
+        f"/api/v1/recommendations/similar/{target.id}?limit=10&same_genre_only=true"
     )
 
     assert response.status_code == 200

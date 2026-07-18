@@ -49,10 +49,7 @@ def get_tracks(
     )
 
     statement = (
-        statement
-        .order_by(Track.popularity.desc(), Track.id.asc())
-        .offset(skip)
-        .limit(limit)
+        statement.order_by(Track.popularity.desc(), Track.id.asc()).offset(skip).limit(limit)
     )
 
     return list(db.scalars(statement).all())

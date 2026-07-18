@@ -39,9 +39,7 @@ def semantic_track_search(
         collection = get_track_collection()
         index_count = collection.count()
     except Exception as exc:
-        raise RecommendationDependencyUnavailableError(
-            CHROMA_UNAVAILABLE_MESSAGE
-        ) from exc
+        raise RecommendationDependencyUnavailableError(CHROMA_UNAVAILABLE_MESSAGE) from exc
 
     if index_count == 0:
         raise RecommendationIndexNotReadyError(INDEX_NOT_READY_MESSAGE)
@@ -59,9 +57,7 @@ def semantic_track_search(
             include=["metadatas", "documents", "distances"],
         )
     except Exception as exc:
-        raise RecommendationDependencyUnavailableError(
-            CHROMA_UNAVAILABLE_MESSAGE
-        ) from exc
+        raise RecommendationDependencyUnavailableError(CHROMA_UNAVAILABLE_MESSAGE) from exc
 
     result_ids = results.get("ids", [[]])[0]
     distances = results.get("distances", [[]])[0]
@@ -79,9 +75,7 @@ def semantic_track_search(
     try:
         tracks = list(db.scalars(statement).all())
     except SQLAlchemyError as exc:
-        raise RecommendationDependencyUnavailableError(
-            DATABASE_UNAVAILABLE_MESSAGE
-        ) from exc
+        raise RecommendationDependencyUnavailableError(DATABASE_UNAVAILABLE_MESSAGE) from exc
 
     tracks_by_id = {track.id: track for track in tracks}
 

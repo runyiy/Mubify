@@ -50,10 +50,7 @@ def min_max_normalize(values: list[float]) -> list[float]:
     if max_value == min_value:
         return [0.0 for _ in values]
 
-    return [
-        (value - min_value) / (max_value - min_value)
-        for value in values
-    ]
+    return [(value - min_value) / (max_value - min_value) for value in values]
 
 
 def get_chroma_candidates(
@@ -65,9 +62,7 @@ def get_chroma_candidates(
         collection = get_track_collection()
         index_count = collection.count()
     except Exception as exc:
-        raise RecommendationDependencyUnavailableError(
-            CHROMA_UNAVAILABLE_MESSAGE
-        ) from exc
+        raise RecommendationDependencyUnavailableError(CHROMA_UNAVAILABLE_MESSAGE) from exc
 
     if index_count == 0:
         raise RecommendationIndexNotReadyError(INDEX_NOT_READY_MESSAGE)
@@ -85,9 +80,7 @@ def get_chroma_candidates(
             include=["metadatas", "distances"],
         )
     except Exception as exc:
-        raise RecommendationDependencyUnavailableError(
-            CHROMA_UNAVAILABLE_MESSAGE
-        ) from exc
+        raise RecommendationDependencyUnavailableError(CHROMA_UNAVAILABLE_MESSAGE) from exc
 
     raw_ids = results.get("ids", [[]])[0]
     distances = results.get("distances", [[]])[0]
@@ -117,9 +110,7 @@ def fetch_tracks_by_ids(
     try:
         tracks = list(db.scalars(statement).all())
     except SQLAlchemyError as exc:
-        raise RecommendationDependencyUnavailableError(
-            DATABASE_UNAVAILABLE_MESSAGE
-        ) from exc
+        raise RecommendationDependencyUnavailableError(DATABASE_UNAVAILABLE_MESSAGE) from exc
 
     return {track.id: track for track in tracks}
 
@@ -183,14 +174,9 @@ def infer_target_audio_profile(
                 getattr(track, feature) * weight
             )
 
-        weighted_sum["tempo"] = weighted_sum.get("tempo", 0.0) + (
-            track.tempo * weight
-        )
+        weighted_sum["tempo"] = weighted_sum.get("tempo", 0.0) + (track.tempo * weight)
 
-    target_profile = {
-        feature: weighted_sum[feature] / total_weight
-        for feature in weighted_sum
-    }
+    target_profile = {feature: weighted_sum[feature] / total_weight for feature in weighted_sum}
 
     return target_profile
 

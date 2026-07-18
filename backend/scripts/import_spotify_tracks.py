@@ -72,9 +72,7 @@ def insert_batch(db, batch: list[dict]) -> int:
 
     statement = insert(Track).values(batch)
 
-    statement = statement.on_conflict_do_nothing(
-        index_elements=["track_id"]
-    )
+    statement = statement.on_conflict_do_nothing(index_elements=["track_id"])
 
     result = db.execute(statement)
     db.commit()
@@ -117,10 +115,7 @@ def import_tracks(csv_path: Path) -> None:
                 if len(batch) >= BATCH_SIZE:
                     inserted = insert_batch(db, batch)
                     inserted_rows += inserted
-                    print(
-                        f"Processed {total_rows} rows | "
-                        f"Inserted {inserted_rows} rows"
-                    )
+                    print(f"Processed {total_rows} rows | Inserted {inserted_rows} rows")
                     batch.clear()
 
             if batch:

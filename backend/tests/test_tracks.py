@@ -150,9 +150,7 @@ def test_get_paginated_tracks_total_uses_search_and_genre_filters(
         popularity=70,
     )
 
-    response = client.get(
-        "/api/v1/tracks/paginated?genre=pop&search=love&limit=1"
-    )
+    response = client.get("/api/v1/tracks/paginated?genre=pop&search=love&limit=1")
 
     assert response.status_code == 200
 
