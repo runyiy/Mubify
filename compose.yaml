@@ -6,7 +6,7 @@ x-backend-environment: &backend-environment
 
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mubify}
       POSTGRES_USER: ${POSTGRES_USER:-mubify}
