@@ -7,8 +7,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN addgroup --system app \
-    && adduser --system --ingroup app app
+RUN addgroup --gid 10001 app \
+    && adduser --disabled-password --gecos "" --no-create-home --uid 10001 --gid 10001 app \
+    && mkdir -p /app/chroma_db \
+    && chown app:app /app/chroma_db
 
 COPY requirements.txt ./requirements.txt
 
