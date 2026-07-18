@@ -14,7 +14,6 @@ from app.repositories.track_repository import get_track_by_id
 from app.schemas.common import MessageResponse
 from app.schemas.favorite import FavoriteRead
 
-
 router = APIRouter()
 
 

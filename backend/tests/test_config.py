@@ -7,7 +7,6 @@ from unittest.mock import patch
 import pydantic_settings
 import pytest
 
-
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "app" / "core" / "config.py"
 
 

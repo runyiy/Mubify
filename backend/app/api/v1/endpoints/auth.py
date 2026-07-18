@@ -13,7 +13,6 @@ from app.repositories.user_repository import (
 from app.schemas.auth import Token
 from app.schemas.user import UserCreate, UserRead
 
-
 router = APIRouter()
 
 

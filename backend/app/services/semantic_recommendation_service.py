@@ -10,7 +10,6 @@ from app.services.recommendation_errors import (
     RecommendationIndexNotReadyError,
 )
 
-
 INDEX_NOT_READY_MESSAGE = (
     "Recommendation index is not ready. Import tracks and run Chroma indexing first."
 )

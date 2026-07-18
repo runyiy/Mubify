@@ -5,16 +5,16 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 
-import anyio.to_thread
 import anyio
+import anyio.to_thread
 import httpx
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import Base
 import app.models  # noqa: F401
+from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.track import Track

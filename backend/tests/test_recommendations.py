@@ -2,10 +2,8 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.v1.endpoints import recommendations as recommendations_endpoint
-from app.schemas.recommendation import HybridRecommendationRequest
-from app.schemas.recommendation import SemanticRecommendationRequest
-from app.services import hybrid_recommendation_service
-from app.services import semantic_recommendation_service
+from app.schemas.recommendation import HybridRecommendationRequest, SemanticRecommendationRequest
+from app.services import hybrid_recommendation_service, semantic_recommendation_service
 from app.services.recommendation_errors import (
     RecommendationDependencyUnavailableError,
     RecommendationIndexCorruptError,

@@ -7,7 +7,6 @@ from sqlalchemy.dialects.postgresql import insert
 from app.db.session import SessionLocal
 from app.models.track import Track
 
-
 BASE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_CSV_PATH = BASE_DIR / "data" / "dataset.csv"
 

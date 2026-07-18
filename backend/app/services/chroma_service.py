@@ -4,7 +4,6 @@ import chromadb
 
 from app.models.track import Track
 
-
 CHROMA_PATH = "./chroma_db"
 CHROMA_COLLECTION_NAME = "spotify_tracks"
 

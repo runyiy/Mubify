@@ -12,13 +12,12 @@ from app.schemas.recommendation import (
 )
 from app.services.hybrid_recommendation_service import hybrid_recommendation_search
 from app.services.recommendation_errors import (
-    RecommendationError,
     RecommendationDependencyUnavailableError,
+    RecommendationError,
     RecommendationIndexCorruptError,
     RecommendationIndexNotReadyError,
 )
 from app.services.semantic_recommendation_service import semantic_track_search
-
 
 router = APIRouter()
 
