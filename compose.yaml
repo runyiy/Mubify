@@ -1,0 +1,61 @@
+x-backend-environment: &backend-environment
+  DATABASE_URL: postgresql://${POSTGRES_USER:-mubify}:${POSTGRES_PASSWORD:-mubify-local-password}@db:5432/${POSTGRES_DB:-mubify}
+  SECRET_KEY: ${SECRET_KEY:-mubify-local-development-secret}
+  JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mubify}
+      POSTGRES_USER: ${POSTGRES_USER:-mubify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mubify-local-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: mubify-backend:local
+    environment: *backend-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: mubify-backend:local
+    environment: *backend-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    init: true
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5).read()
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
