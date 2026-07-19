@@ -7,7 +7,10 @@ from unittest.mock import patch
 import pydantic_settings
 import pytest
 
+from app.services.chroma_service import CHROMA_PATH
+
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "app" / "core" / "config.py"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_config_without_dotenv(monkeypatch, module_name, environment):
@@ -48,7 +51,7 @@ def test_missing_database_url_has_clear_error(monkeypatch):
 
     assert "Missing backend configuration" in message
     assert "DATABASE_URL" in message
-    assert "backend/.env.example" in message
+    assert ".env.example" in message
 
 
 def test_missing_secret_key_has_clear_error(monkeypatch):
@@ -63,4 +66,8 @@ def test_missing_secret_key_has_clear_error(monkeypatch):
 
     assert "Missing backend configuration" in message
     assert "SECRET_KEY" in message
-    assert "backend/.env.example" in message
+    assert ".env.example" in message
+
+
+def test_chroma_path_is_resolved_from_project_root():
+    assert CHROMA_PATH == PROJECT_ROOT / "chroma_db"

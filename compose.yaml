@@ -22,7 +22,7 @@ services:
 
   migrate:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     image: mubify-backend:local
     environment: *backend-environment
@@ -34,7 +34,7 @@ services:
 
   api:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     image: mubify-backend:local
     environment: *backend-environment

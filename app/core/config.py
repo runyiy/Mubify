@@ -3,8 +3,8 @@ from pathlib import Path
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BACKEND_DIR = Path(__file__).resolve().parents[2]
-ENV_FILE = BACKEND_DIR / ".env"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -33,7 +33,7 @@ except ValidationError as exc:
 
     raise RuntimeError(
         "Missing backend configuration: "
-        f"{missing_text}. Create backend/.env from backend/.env.example "
+        f"{missing_text}. Create .env from .env.example "
         "or set these environment variables before starting the app. "
         f"Expected env file location: {ENV_FILE}"
     ) from exc

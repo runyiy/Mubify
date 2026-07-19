@@ -1,9 +1,9 @@
 AGENTS.md
 Project
 
-Mubify is a backend-focused portfolio project for backend engineering job applications.
+Mubify is a backend portfolio project for backend engineering job applications.
 
-The backend is located in backend/.
+The backend code is located at the repository root.
 
 Main stack:
 
@@ -15,7 +15,7 @@ JWT
 pytest
 ChromaDB
 
-This was a team project. The repository owner was responsible for backend development. Do not claim responsibility for frontend work.
+This repository is a backend-only version extracted from a team project. The repository owner was responsible for the backend implementation and does not claim responsibility for the frontend implementation.
 
 Git Workflow
 Work in the current main branch working tree.
@@ -29,13 +29,13 @@ Stop after validation and wait for user review.
 Scope
 Modify only files required by the current task.
 Do not perform unrelated cleanup or broad refactoring.
-Do not move or rename backend/.
-Do not add a frontend.
+Do not add frontend code.
+Do not claim responsibility for frontend work from the original team project.
 Preserve existing API behavior unless explicitly requested.
 Do not change recommendation weights or ranking logic unless explicitly requested.
 Do not add unnecessary dependencies.
 Backend Rules
-Run backend commands from backend/.
+Run Python, Alembic, pytest, Ruff, and Docker commands from the repository root.
 PostgreSQL is the production database.
 SQLite may be used for fast unit tests.
 Database schema changes require an Alembic migration.
